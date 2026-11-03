@@ -134,6 +134,8 @@ printk(char *fmt, ...)
   return 0;
 }
 
+extern __typeof (printk) printf __attribute__ ((alias ("printk")));
+
 void
 panic(char *s)
 {

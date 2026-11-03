@@ -13,6 +13,7 @@ struct proc proc[NPROC];
 struct proc *initproc;
 
 int nextpid = 1;
+int logging = 0;
 struct spinlock pid_lock;
 
 extern void forkret(void);
@@ -124,6 +125,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->nice = 0;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -163,6 +165,7 @@ freeproc(struct proc *p)
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
+  p->nice = 0;
   p->name[0] = 0;
   p->chan = 0;
   p->killed = 0;
@@ -430,6 +433,7 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  int last = NPROC - 1;
 
   c->proc = 0;
   for (;;) {
@@ -441,31 +445,57 @@ scheduler(void)
     intr_on();
     intr_off();
 
-    int found = 0;
-    for (p = proc; p < &proc[NPROC]; p++) {
+    struct proc *chosen = 0;
+    int chosen_index = -1;
+    int best_nice = 0;
+    for (int offset = 1; offset <= NPROC; offset++) {
+      int index = (last + offset) % NPROC;
+      p = &proc[index];
       acquire(&p->lock);
-      if (p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Don't re-enable interrupts on release.
-        mycpu()->intena = 0;
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
+      if (p->state == RUNNABLE &&
+          (chosen == 0 || p->nice < best_nice)) {
+        chosen = p;
+        chosen_index = index;
+        best_nice = p->nice;
       }
       release(&p->lock);
     }
-    if (found == 0) {
+
+    if (chosen == 0) {
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");
+      continue;
     }
+
+    p = chosen;
+    uint tick_snapshot;
+    acquire(&tickslock);
+    tick_snapshot = ticks;
+    release(&tickslock);
+
+    acquire(&p->lock);
+    if (p->state != RUNNABLE) {
+      release(&p->lock);
+      continue;
+    }
+
+    // Switch to chosen process.  It is the process's job
+    // to release its lock and then reacquire it
+    // before jumping back to us.
+    p->state = RUNNING;
+    c->proc = p;
+    if (logging)
+      printf("running %d at %d\n", p->pid, (int)tick_snapshot);
+    swtch(&c->context, &p->context);
+
+    // Don't re-enable interrupts on release.
+    mycpu()->intena = 0;
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    last = chosen_index;
+    release(&p->lock);
   }
 }
 
@@ -636,6 +666,53 @@ killed(struct proc *p)
   k = p->killed;
   release(&p->lock);
   return k;
+}
+
+uint64
+sys_startLogging(void)
+{
+  logging = 1;
+  printk("Logging Started\n");
+  return 0;
+}
+
+uint64
+sys_stopLogging(void)
+{
+  logging = 0;
+  printk("Logging Stopped\n");
+  return 0;
+}
+
+uint64
+sys_nice(void)
+{
+  int pid, inc, value;
+  struct proc *p;
+
+  argint(0, &pid);
+  argint(1, &inc);
+
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->state != UNUSED && p->pid == pid) {
+      if (inc > 19 - p->nice)
+        p->nice = 19;
+      else if (inc < -20 - p->nice)
+        p->nice = -20;
+      else
+        p->nice += inc;
+      value = p->nice;
+      release(&p->lock);
+
+      if (logging)
+        printk("nice set to %d for %d\n", value, pid);
+      return value;
+    }
+    release(&p->lock);
+  }
+
+  return 0;
 }
 
 // Copy to either a user address, or kernel address,
