@@ -134,6 +134,16 @@ $U/_forktest: $U/forktest.o $(ULIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
 	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
 
+$U/_mlfqwt: $U/mlfqweightedtest.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $U/mlfqweightedtest.o $(ULIB)
+	$(OBJDUMP) -S $@ > $U/mlfqweightedtest.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/mlfqweightedtest.sym
+
+$U/_mlfqwake: $U/mlfqwaketest.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $U/mlfqwaketest.o $(ULIB)
+	$(OBJDUMP) -S $@ > $U/mlfqwaketest.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $U/mlfqwaketest.sym
+
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 	gcc -Wno-unknown-attributes -I. -o mkfs/mkfs mkfs/mkfs.c
 
@@ -166,6 +176,13 @@ UPROGS=\
 	$U/_sync\
 	$U/_wl\
 	$U/_logwl\
+	$U/_mlfqtest\
+	$U/_mlfqnicetest\
+	$U/_mlfqpreempt\
+	$U/_mlfqboost\
+	$U/_stridenice\
+	$U/_mlfqwt\
+	$U/_mlfqwake\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

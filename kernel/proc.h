@@ -110,8 +110,10 @@ struct proc {
   // in policy_proc_init() in policy.c.
   int qticks; // ticks used in the current quantum
   int level;  // queue level, for multi-level policies
+  int start_level; // starting queue level for MLFQ
   int used;   // ticks used at the current level (allotment)
   uint64 vrt; // weighted CPU usage, for fair-share policies
+  uint64 mlfq_pass[3]; // ID 5 virtual CPU usage for Q0, Q1, and Q2
 
   // Project 1C: workload harness slot, or -1 if not a worker.
   // Owned by workload.c; do not modify.
