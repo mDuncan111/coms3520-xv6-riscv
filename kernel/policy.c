@@ -28,6 +28,15 @@
 //  6. Do not modify the protected files (kernel/workload.c,
 //     kernel/workload.h, user/wl.c).
 
+// Project 1C scheduler policies:
+// ID 3: Nice-initialized MLFQ with three priority queues.
+// ID 4: Stride scheduling with nice-weighted CPU shares.
+// ID 5: MLFQ with nice-weighted scheduling within each queue.
+// ID 6: Round robin with a 5-tick quantum.
+// ID 10: MLFQ with a 5-tick Q1 quantum.
+// ID 11: MLFQ with a 5-tick Q1 allotment.
+// ID 12: MLFQ with a 30-tick priority boost.
+
 #include "types.h"
 #include "param.h"
 #include "memlayout.h"
